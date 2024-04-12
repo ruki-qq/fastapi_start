@@ -1,0 +1,20 @@
+from typing import Annotated
+
+from annotated_types import MaxLen, MinLen
+from pydantic import BaseModel, ConfigDict
+
+
+class ProductBase(BaseModel):
+    name: Annotated[str, MinLen(1), MaxLen(30)]
+    description: str
+    price: int
+
+
+class ProductCreate(ProductBase):
+    pass
+
+
+class Product(ProductBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
