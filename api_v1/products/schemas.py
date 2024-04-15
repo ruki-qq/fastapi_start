@@ -13,13 +13,16 @@ class ProductBase(BaseModel):
 class ProductCreate(ProductBase):
     pass
 
+
 class ProductUpdate(ProductCreate):
     pass
+
 
 class ProductUpdatePartial(ProductCreate):
     name: Annotated[str, MinLen(1), MaxLen(30)] | None = None
     description: str | None = None
     price: int | None = None
+
 
 class Product(ProductBase):
     model_config = ConfigDict(from_attributes=True)
