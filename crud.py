@@ -1,10 +1,19 @@
 import asyncio
+from pprint import pprint
 
 from sqlalchemy import select, Result
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from core.models import User, db_helper, Profile, Post
+from core.models import (
+    User,
+    db_helper,
+    Profile,
+    Post,
+    Order,
+    Product,
+    OrderProductAssociation,
+)
 
 
 async def create_user(session: AsyncSession, username: str) -> User:
@@ -102,19 +111,128 @@ async def get_profiles_with_users_and_users_with_posts(session: AsyncSession):
         print(profile.user.posts)
 
 
+async def create_order(
+    session: AsyncSession, total_sum: int, promocode: str | None = None
+) -> Order:
+    order = Order(promocode=promocode, total_sum=total_sum)
+    session.add(order)
+    await session.commit()
+    return order
+
+
+async def create_product(
+    session: AsyncSession, name: str, description: str, price: int
+) -> Product:
+    product = Product(name=name, description=description, price=price)
+    session.add(product)
+    await session.commit()
+    return product
+
+
+async def create_orders_and_products(session: AsyncSession):
+    order = await create_order(
+        session,
+        333,
+    )
+    order_promo = await create_order(session, 254, "NEW1000")
+
+    keyboard = await create_product(
+        session,
+        "Razer Chroma",
+        "RGB keyboard",
+        199,
+    )
+    mouse = await create_product(
+        session,
+        "Razer Deathadder V3",
+        "RGB mouse",
+        299,
+    )
+    headphones = await create_product(
+        session,
+        "Razer Kraken 2024",
+        "RGB headphones",
+        399,
+    )
+
+    order = await session.scalar(
+        select(Order).options(selectinload(Order.products)).where(Order.id == order.id)
+    )
+    order_promo = await session.scalar(
+        select(Order)
+        .options(selectinload(Order.products))
+        .where(Order.id == order_promo.id)
+    )
+    order.products.append(mouse)
+    order.products.append(keyboard)
+    # order_promo.products.append(keyboard)
+    # order_promo.products.append(headphones)
+    order_promo.products = [keyboard, headphones]
+
+    await session.commit()
+
+
+async def get_orders_with_products(session: AsyncSession) -> list[Order]:
+    return list(
+        await session.scalars(
+            select(Order).options(selectinload(Order.products)).order_by(Order.id)
+        )
+    )
+
+
+async def get_orders_with_products_details(session: AsyncSession) -> list[Order]:
+    return list(
+        await session.scalars(
+            select(Order)
+            .options(
+                selectinload(Order.products_details).joinedload(
+                    OrderProductAssociation.product
+                )
+            )
+            .order_by(Order.id)
+        )
+    )
+
+
+async def print_orders_with_products_through_secondary(session: AsyncSession):
+    orders = await get_orders_with_products(session)
+    for order in orders:
+        print(order.id, order.created_at, order.promocode)
+        print(
+            f"products: {[(product.id, product.name, product.price) for product in order.products]}"
+        )
+
+
+async def print_orders_with_products_with_association(session: AsyncSession):
+    orders = await get_orders_with_products_details(session)
+    for order in orders:
+        print(order.id, order.created_at, order.promocode)
+        print(
+            f"products: {[(product_details.product.id, product_details.product.name, product_details.product.price, product_details.count) for product_details in order.products_details]}"
+        )
+
+
+async def main_relations(session: AsyncSession):
+    # await create_user(session, "no_posts")
+    # await create_user(session, "josh")
+    # user_sam = await get_user_by_username(session, "sam")
+    # user_josh = await get_user_by_username(session, "sam")
+    # print("Found user", username, user)
+    # await create_user_profile(session, 2, first_name="Josh", last_name="Sepiol")
+    # print(profile)
+    # await get_users_with_profiles(session)
+    # await create_posts(session, user_sam.id, "SQL2", "SQL1", "SQL0")
+    # await create_posts(session, user_josh.id, "FASTAPI3", "FASTAPI1", "FASTAPI2")
+    await get_profiles_with_users_and_users_with_posts(session)
+
+
+async def demo_m2m(session: AsyncSession):
+    await print_orders_with_products_with_association(session)
+
+
 async def main():
     async with db_helper.session_factory() as session:
-        # await create_user(session, "no_posts")
-        # await create_user(session, "josh")
-        # user_sam = await get_user_by_username(session, "sam")
-        # user_josh = await get_user_by_username(session, "sam")
-        # print("Found user", username, user)
-        # await create_user_profile(session, 2, first_name="Josh", last_name="Sepiol")
-        # print(profile)
-        # await get_users_with_profiles(session)
-        # await create_posts(session, user_sam.id, "SQL2", "SQL1", "SQL0")
-        # await create_posts(session, user_josh.id, "FASTAPI3", "FASTAPI1", "FASTAPI2")
-        await get_profiles_with_users_and_users_with_posts(session)
+        await demo_m2m(session)
 
 
 if __name__ == "__main__":
