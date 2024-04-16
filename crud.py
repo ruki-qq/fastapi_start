@@ -1,7 +1,6 @@
 import asyncio
-from pprint import pprint
 
-from sqlalchemy import select, Result
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -172,6 +171,68 @@ async def create_orders_and_products(session: AsyncSession):
     await session.commit()
 
 
+async def create_orders_and_products_with_assoc(session: AsyncSession):
+    order = await create_order(
+        session,
+        333,
+    )
+    order_promo = await create_order(session, 254, "NEW1000")
+
+    keyboard = await create_product(
+        session,
+        "Razer Chroma",
+        "RGB keyboard",
+        199,
+    )
+    mouse = await create_product(
+        session,
+        "Razer Deathadder V3",
+        "RGB mouse",
+        299,
+    )
+    headphones = await create_product(
+        session,
+        "Razer Kraken 2024",
+        "RGB headphones",
+        399,
+    )
+
+    order = await session.scalar(
+        select(Order)
+        .options(
+            selectinload(Order.products_details).joinedload(
+                OrderProductAssociation.product
+            )
+        )
+        .where(Order.id == order.id)
+    )
+
+    order_promo = await session.scalar(
+        select(Order)
+        .options(
+            selectinload(Order.products_details).joinedload(
+                OrderProductAssociation.product
+            )
+        )
+        .where(Order.id == order_promo.id)
+    )
+
+    orders = [order, order_promo]
+
+    for ordero in orders:
+        ordero.products_details.append(
+            OrderProductAssociation(product=mouse, count=2, unit_price=399)
+        )
+
+    order.products_details.append(
+        OrderProductAssociation(product=keyboard, count=1, unit_price=200)
+    )
+    order_promo.products_details.append(
+        OrderProductAssociation(product=headphones, count=5, unit_price=1999)
+    )
+    await session.commit()
+
+
 async def get_orders_with_products(session: AsyncSession) -> list[Order]:
     return list(
         await session.scalars(
@@ -212,22 +273,38 @@ async def print_orders_with_products_with_association(session: AsyncSession):
         )
 
 
-async def main_relations(session: AsyncSession):
-    # await create_user(session, "no_posts")
-    # await create_user(session, "josh")
-    # user_sam = await get_user_by_username(session, "sam")
-    # user_josh = await get_user_by_username(session, "sam")
-    # print("Found user", username, user)
-    # await create_user_profile(session, 2, first_name="Josh", last_name="Sepiol")
-    # print(profile)
-    # await get_users_with_profiles(session)
-    # await create_posts(session, user_sam.id, "SQL2", "SQL1", "SQL0")
-    # await create_posts(session, user_josh.id, "FASTAPI3", "FASTAPI1", "FASTAPI2")
-    await get_profiles_with_users_and_users_with_posts(session)
+async def add_tea_product_to_existing_order_assoc(session: AsyncSession):
+    orders = await get_orders_with_products_details(session)
+    tea = await create_product(
+        session,
+        "Tea",
+        "Green tea",
+        400,
+    )
+    for order in orders:
+        order.products_details.append(
+            OrderProductAssociation(product=tea, count=2, unit_price=399)
+        )
+    await session.commit()
+
+
+# async def main_relations(session: AsyncSession):
+#     await create_user(session, "no_posts")
+#     await create_user(session, "josh")
+#     user_sam = await get_user_by_username(session, "sam")
+#     user_josh = await get_user_by_username(session, "sam")
+#     print("Found user", username, user)
+#     await create_user_profile(session, 2, first_name="Josh", last_name="Sepiol")
+#     print(profile)
+#     await get_users_with_profiles(session)
+#     await create_posts(session, user_sam.id, "SQL2", "SQL1", "SQL0")
+#     await create_posts(session, user_josh.id, "FASTAPI3", "FASTAPI1", "FASTAPI2")
+#     await get_profiles_with_users_and_users_with_posts(session)
 
 
 async def demo_m2m(session: AsyncSession):
     await print_orders_with_products_with_association(session)
+    # await add_tea_product_to_existing_order_assoc(session)
 
 
 async def main():
