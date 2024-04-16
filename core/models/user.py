@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.models.base import Base
+from core.models import Base
 
 if TYPE_CHECKING:
-    from core.models.post import Post
-    from core.models.profile import Profile
+    from core.models import Post
+    from core.models import Profile
 
 
 class User(Base):
